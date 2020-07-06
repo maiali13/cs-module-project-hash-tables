@@ -21,7 +21,8 @@ class HashTable:
     """
 
     def __init__(self, capacity):
-        # Your code here
+        self.capacity = capacity
+        self.table = [None] * MIN_CAPACITY
 
 
     def get_num_slots(self):
@@ -34,27 +35,34 @@ class HashTable:
 
         Implement this.
         """
-        # Your code here
+        return len(self.table)
 
 
     def get_load_factor(self):
         """
         Return the load factor for this hash table.
-
-        Implement this.
+        (number of keys / capacity)
         """
-        # Your code here
+        number_keys = sum(1 for x in filter(None.__ne__, self.table))
+        return (number_keys/capacity)
 
 
     def fnv1(self, key):
         """
         FNV-1 Hash, 64-bit
+        https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function
 
         Implement this, and/or DJB2.
         """
+        hash = 0xcbf29ce484222325 # decimal: 14695981039346656037
+        fnv_64_prime = 0x00000100000001B3 # decimal: 1099511628211
+        uint64_max = 2 ** 64
 
-        # Your code here
+        for x in key:
+            hash = hash ^ ord(x)
+            hash = (hash * fnv_64_prime) % uint64_max
 
+        return hash
 
     def djb2(self, key):
         """
@@ -62,7 +70,13 @@ class HashTable:
 
         Implement this, and/or FNV-1.
         """
-        # Your code here
+        hash = 5381
+
+        for x in key:
+            #hash = ((hash << 5) + hash) + ord(x)
+            hash = (hash * 33) + ord(x)
+
+        return hash
 
 
     def hash_index(self, key):
@@ -81,8 +95,8 @@ class HashTable:
 
         Implement this.
         """
-        # Your code here
-
+        index = self.hash_index(key)
+        self.table[index] = HashTableEntry(key, value)
 
     def delete(self, key):
         """
@@ -92,7 +106,14 @@ class HashTable:
 
         Implement this.
         """
-        # Your code here
+        index = self.hash_index(key)
+
+        if self.table[index] == None:
+            print("Error: Key not found")
+
+        else:
+            self.table[index] = None
+        # could just do self.put(key, None)
 
 
     def get(self, key):
@@ -103,7 +124,13 @@ class HashTable:
 
         Implement this.
         """
-        # Your code here
+        index = self.hash_index(key)
+        key_value = self.table[index]
+
+        if key_value is not None:
+            return key_value
+
+        return None
 
 
     def resize(self, new_capacity):
@@ -114,6 +141,7 @@ class HashTable:
         Implement this.
         """
         # Your code here
+        pass
 
 
 
@@ -151,3 +179,15 @@ if __name__ == "__main__":
         print(ht.get(f"line_{i}"))
 
     print("")
+
+    print(ht.djb2("line_1"))
+    print(ht.fnv1("line_1"))
+    print(ht.hash_index("line_1"))
+
+    print(ht.djb2("line_9"))
+    print(ht.fnv1("line_9"))
+    print(ht.hash_index("line_9"))
+
+    print(ht.djb2("line_10"))
+    print(ht.fnv1("line_10"))
+    print(ht.hash_index("line_10"))
