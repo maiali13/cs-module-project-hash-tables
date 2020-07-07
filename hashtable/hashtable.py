@@ -7,6 +7,8 @@ class HashTableEntry:
         self.value = value
         self.next = None
 
+    def __repr__(self):
+        return (f"(key = {self.key}, value = {self.value})")
 
 # Hash table can't have fewer than this many slots
 MIN_CAPACITY = 8
@@ -21,8 +23,15 @@ class HashTable:
     """
 
     def __init__(self, capacity):
-        self.capacity = capacity
-        self.table = [None] * MIN_CAPACITY
+        if capacity > MIN_CAPACITY:
+            self.capacity = capacity
+            self.table = [None] * self.capacity
+        else:
+            self.capacity = MIN_CAPACITY
+            self.table = [None] * self.capacity
+        self.num_keys = 0 # number of keys and values
+        # self.max_load_factor = 0.7
+        # self.min_load_factor = 0.2
 
 
     def get_num_slots(self):
@@ -35,16 +44,17 @@ class HashTable:
 
         Implement this.
         """
-        return len(self.table)
+        return self.capacity
 
 
     def get_load_factor(self):
         """
         Return the load factor for this hash table.
+        aka all occupied space
         (number of keys / capacity)
         """
-        number_keys = sum(1 for x in filter(None.__ne__, self.table))
-        return (number_keys/capacity)
+        # number_keys = sum(1 for x in filter(None.__ne__, self.table))
+        return float(self.num_keys / self.capacity)
 
 
     def fnv1(self, key):
@@ -54,15 +64,12 @@ class HashTable:
 
         Implement this, and/or DJB2.
         """
-        hash = 0xcbf29ce484222325 # decimal: 14695981039346656037
-        fnv_64_prime = 0x00000100000001B3 # decimal: 1099511628211
-        uint64_max = 2 ** 64
-
-        for x in key:
-            hash = hash ^ ord(x)
-            hash = (hash * fnv_64_prime) % uint64_max
-
-        return hash
+        total = 0
+        for b in key.encode():
+            total += b
+            total &= 0xffffffffffffffff #64 bit
+        
+        return total
 
     def djb2(self, key):
         """
@@ -70,19 +77,19 @@ class HashTable:
 
         Implement this, and/or FNV-1.
         """
-        hash = 5381
-
-        for x in key:
-            #hash = ((hash << 5) + hash) + ord(x)
-            hash = (hash * 33) + ord(x)
-
-        return hash
+        total = 0
+        for b in key.encode():
+            total += b
+            total &= 0xffffffff  #32 bit
+        
+        return total
 
 
     def hash_index(self, key):
         """
         Take an arbitrary key and return a valid integer index
         between within the storage capacity of the hash table.
+        aka creates index value based on the key
         """
         #return self.fnv1(key) % self.capacity
         return self.djb2(key) % self.capacity
@@ -93,10 +100,34 @@ class HashTable:
 
         Hash collisions should be handled with Linked List Chaining.
 
-        Implement this.
+        -find slot for key
+        -search linked list for key
+        -update list if found
+        -if not found, add it to the list/ update HashTableEntry 
         """
         index = self.hash_index(key)
-        self.table[index] = HashTableEntry(key, value)
+        head = self.table[index] # setting head node
+        # if the head isnt empty, traverse entire linked list
+        while head is not None: 
+            if head.key == key:
+                head.value = value # if the keys are equal, overwrite the value
+                return
+            else: #go to next node if no key found
+                head = head.next
+        # append new key value
+        head = HashTableEntry(key, value)
+        self.num_keys += 1
+
+        # STRETCH
+        # 
+        # Check load factor greater than 0.7 (70% full)
+        if (self.num_keys / self.capacity) <= 0.2:
+            # If load factor less than 0.2 (underloaded), cut table size in half
+            self.resize(self.capacity / 2)
+        elif (self.num_keys / self.capacity) >= 0.7:
+            # If load factor greater than 0.7 (overloaded), double table size
+            self.resize(2 * self.capacity)
+
 
     def delete(self, key):
         """
@@ -104,16 +135,33 @@ class HashTable:
 
         Print a warning if the key is not found.
 
-        Implement this.
+        - find slot for key
+        - search ll for key
+        - delete from list if found + return deleted value
+        - return None if not found
         """
         index = self.hash_index(key)
-
-        if self.table[index] == None:
-            print("Error: Key not found")
-
+        head = self.table[index] # setting head node
+        keyFound = False
+        prev = None
+        current = head
+        while current is not None:
+            if current.key == key:
+                keyFound = True
+                self.num_keys -= 1
+                if prev is not None:
+                    prev.next = current.next
+                else:
+                    head = current.next
+                return
+            else:
+                prev = current
+                current = current.next
+            
+        if not keyFound:
+            print('Error: Key {} not found to delete'.format(key))
         else:
-            self.table[index] = None
-        # could just do self.put(key, None)
+            print('Key {} deleted'.format(key))
 
 
     def get(self, key):
@@ -122,14 +170,19 @@ class HashTable:
 
         Returns None if the key is not found.
 
-        Implement this.
+        -find slot for key
+        -search ll for key
+        -if not found return none
+        -if found return value
         """
         index = self.hash_index(key)
-        key_value = self.table[index]
+        head = self.table[index]
 
-        if key_value is not None:
-            return key_value
-
+        while head is not None:
+            if head.key == key:
+                return head.value
+            else:
+                head = head.next
         return None
 
 
@@ -137,11 +190,24 @@ class HashTable:
         """
         Changes the capacity of the hash table and
         rehashes all key/value pairs.
+        aka remove everything from old hash array, put it in new resized array
 
-        Implement this.
+        - create new array (double if larger, half if smaller)
+        - O(n) traverse old hash table
+        - for each element: find its slot in new array and place it there
+        STRETCH: do this automatically when hashtable is overloaded or underloaded
+        ht is overloaded when load factor > 0.7
+        ht is underloaded when load factor < 0.2
         """
-        # Your code here
-        pass
+        new_ht = HashTable(new_capacity) # create new array
+        
+        for item in self.table:
+            while item is not None:
+                new_ht.put(key,value)
+                item = item.next
+        
+        self.capacity = new_ht.capacity
+        self.table = new_ht.table
 
 
 
